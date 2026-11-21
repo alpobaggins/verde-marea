@@ -51,6 +51,16 @@ model User {
   createdAt    DateTime   @default(now()) @db.Timestamptz(3)
   bookings     Booking[]
   auditEntries AuditLog[]
+  sessions     Session[]
+}
+
+model Session {
+  tokenHash String   @id @db.Char(64)
+  userId    String   @db.Uuid
+  expiresAt DateTime @db.Timestamptz(3)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
 }
 
 model Table {
