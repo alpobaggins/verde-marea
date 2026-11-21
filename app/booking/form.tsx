@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import { formatBookingTime } from "../../lib/booking/display";
 import { apiError } from "./http-error";
 
@@ -26,13 +26,20 @@ export function BookingForm({ first, last, timeZone, signedIn }: {
   const [selected, setSelected] = useState("");
   const [pending, setPending] = useState<"search" | "book" | null>(null);
   const [error, setError] = useState("");
-  const [booked, setBooked] = useState(false);
+  const [bookingId, setBookingId] = useState("");
+  const [selectionCleared, setSelectionCleared] = useState(false);
   const [needsLogin, setNeedsLogin] = useState(!signedIn);
 
+  const errorNotice = useRef<HTMLParagraphElement>(null);
+  useEffect(() => {
+    if (error) errorNotice.current?.focus();
+  }, [error]);
+
   function resetResult() {
+    setSelectionCleared(Boolean(selected));
     setAvailability(null);
     setSelected("");
-    setBooked(false);
+    setBookingId("");
     setError("");
   }
 
@@ -70,8 +77,9 @@ export function BookingForm({ first, last, timeZone, signedIn }: {
         body: JSON.stringify({ date, startsAt: selected, guests: Number(guests) }),
       });
       if (response.status === 201) {
+        const booking: { id: string } = await response.json();
         resetResult();
-        setBooked(true);
+        setBookingId(booking.id);
       } else {
         const message = await apiError(response, "Не удалось создать бронирование.");
         setError(message);
@@ -93,7 +101,7 @@ export function BookingForm({ first, last, timeZone, signedIn }: {
 
   return (
     <>
-      <form className="auth-form" onSubmit={search}>
+      <form className="auth-form booking-search" onSubmit={search}>
         <label htmlFor="booking-date">Дата
           <input id="booking-date" type="date" required min={first} max={last} value={date}
             disabled={Boolean(pending)} onChange={(event) => { setDate(event.target.value); resetResult(); }} />
@@ -102,30 +110,56 @@ export function BookingForm({ first, last, timeZone, signedIn }: {
           <input id="booking-guests" type="number" min={1} step={1} required value={guests}
             disabled={Boolean(pending)} onChange={(event) => { setGuests(event.target.value); resetResult(); }} />
         </label>
-        <button disabled={Boolean(pending)}>Найти свободное время</button>
+        <button className="button" disabled={Boolean(pending)}>
+          <span className="button-label">
+            <span aria-hidden={pending === "search"}>Найти свободное время</span>
+            {pending === "search" && <span className="button-busy-label">Поиск…</span>}
+          </span>
+        </button>
       </form>
-      <div role="status" aria-live="polite">
+      <div
+        className={!pending && availability?.status === "available" ? "sr-only" : "booking-feedback"}
+        data-success={Boolean(bookingId)}
+        data-loading={Boolean(pending)}
+        role="status"
+      >
         {pending === "search" && "Загружаем свободное время…"}
         {pending === "book" && "Отправляем бронирование…"}
+        {!pending && availability?.status === "available" && "Выберите время из доступных окон."}
         {!pending && availability && availability.status !== "available" && availabilityMessages[availability.status]}
-        {booked && <>Бронирование создано. <Link href="/account">Посмотреть в личном кабинете</Link></>}
+        {!pending && !availability && !bookingId && selectionCleared && "Выбор времени сброшен. Повторите поиск."}
+        {bookingId && (
+          <>
+            <strong className="booking-confirmation">Бронирование создано</strong>
+            <span>Заявка ожидает подтверждения ресторана.</span>
+            <span className="booking-reference">Номер бронирования: {bookingId}</span>
+            <Link href="/account">Посмотреть в личном кабинете</Link>
+          </>
+        )}
       </div>
-      {error && <p role="alert">{error}</p>}
+      {error && <p className="guest-error" ref={errorNotice} role="alert" tabIndex={-1}>{error}</p>}
       {availability?.status === "available" && (
-        <form className="auth-form" onSubmit={book}>
+        <form className="auth-form booking-results" onSubmit={book}>
           <fieldset disabled={Boolean(pending)} className="booking-slots">
             <legend>Свободное время</legend>
-            {availability.slots.map(({ startsAt, endsAt }) => (
-              <label key={startsAt}>
-                <input type="radio" name="startsAt" value={startsAt} checked={selected === startsAt}
-                  onChange={() => setSelected(startsAt)} />
-                <span>{formatBookingTime(startsAt, timeZone)}–{formatBookingTime(endsAt, timeZone)}</span>
-              </label>
-            ))}
+            <div className="booking-slot-grid">
+              {availability.slots.map(({ startsAt, endsAt }) => (
+                <label key={startsAt}>
+                  <input type="radio" name="startsAt" value={startsAt} checked={selected === startsAt}
+                    onChange={() => setSelected(startsAt)} />
+                  <span>{formatBookingTime(startsAt, timeZone)}–{formatBookingTime(endsAt, timeZone)}</span>
+                </label>
+              ))}
+            </div>
           </fieldset>
           {needsLogin
-            ? <Link href="/login?next=booking">Войти для бронирования</Link>
-            : <button disabled={Boolean(pending) || !selected}>Забронировать</button>}
+            ? <Link className="button" href="/login?next=booking">Войти для бронирования</Link>
+            : <button className="button" disabled={Boolean(pending) || !selected}>
+                <span className="button-label">
+                  <span aria-hidden={pending === "book"}>Забронировать</span>
+                  {pending === "book" && <span className="button-busy-label">Отправка…</span>}
+                </span>
+              </button>}
         </form>
       )}
     </>

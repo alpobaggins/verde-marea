@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { currentUser } from "../../lib/auth/session";
+import { GuestHeader } from "../../components/guest-header";
 import { AuthForm } from "../auth-form";
 
 export default async function LoginPage({
@@ -13,12 +14,16 @@ export default async function LoginPage({
   if (await currentUser()) redirect(returnToBooking ? "/booking" : "/account");
 
   return (
-    <main className="auth-page">
-      <Link href="/">Verde Marea</Link>
-      <h1>Вход</h1>
-      {registered === "1" && <p role="status">Аккаунт создан. Войдите с вашим email и паролем.</p>}
-      <AuthForm returnToBooking={returnToBooking} />
-      <Link href={returnToBooking ? "/register?next=booking" : "/register"}>Зарегистрироваться</Link>
-    </main>
+    <>
+      <GuestHeader />
+      <main className="guest-container guest-auth">
+        <h1 className="guest-title">Вход</h1>
+        <div className="guest-panel guest-auth-panel">
+          {registered === "1" && <p role="status">Аккаунт создан. Войдите с вашим email и паролем.</p>}
+          <AuthForm returnToBooking={returnToBooking} />
+          <Link href={returnToBooking ? "/register?next=booking" : "/register"}>Зарегистрироваться</Link>
+        </div>
+      </main>
+    </>
   );
 }

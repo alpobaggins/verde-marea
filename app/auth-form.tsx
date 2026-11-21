@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useState } from "react";
+import { useActionState, useEffect, useRef, useState } from "react";
 import { login, logout, register } from "../lib/auth/actions";
 import type { AuthFormState } from "../lib/auth/validation";
 
@@ -19,9 +19,15 @@ export function AuthForm({ registration = false, returnToBooking = false }: {
   );
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
+  const form = useRef<HTMLFormElement>(null);
+
+  useEffect(() => {
+    const target = form.current?.querySelector<HTMLElement>('[aria-invalid="true"], [data-form-error]');
+    target?.focus();
+  }, [state]);
 
   return (
-    <form action={action} className="auth-form">
+    <form ref={form} action={action} className="auth-form">
       {returnToBooking && <input type="hidden" name="next" value="booking" />}
       {fields.filter((field) => registration || field.name !== "name").map((field) => {
         const errors = state.fields?.[field.name];
@@ -48,8 +54,13 @@ export function AuthForm({ registration = false, returnToBooking = false }: {
           </div>
         );
       })}
-      {state.error && <p role="alert">{state.error}</p>}
-      <button disabled={pending}>{pending ? "Отправка…" : registration ? "Зарегистрироваться" : "Войти"}</button>
+      {state.error && <p role="alert" data-form-error tabIndex={-1}>{state.error}</p>}
+      <button className="button" disabled={pending}>
+        <span className="button-label">
+          <span aria-hidden={pending}>{registration ? "Зарегистрироваться" : "Войти"}</span>
+          {pending && <span className="button-busy-label">Отправка…</span>}
+        </span>
+      </button>
     </form>
   );
 }
