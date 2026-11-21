@@ -14,6 +14,6 @@ export function formatBookingTime(value: Date | string, timeZone: string) {
   }).format(new Date(value));
 }
 
-export function formatBookingDate(value: Date, timeZone: string) {
-  return new Intl.DateTimeFormat("ru-RU", { timeZone, dateStyle: "long" }).format(value);
+export function formatBookingDate(value: Date | string, timeZone: string) {
+  return new Intl.DateTimeFormat("ru-RU", { timeZone, dateStyle: "long" }).format(new Date(value));
 }

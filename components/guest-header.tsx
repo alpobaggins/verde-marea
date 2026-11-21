@@ -1,9 +1,14 @@
 "use client";
 
-import Link from "next/link";
+import Link, { useLinkStatus } from "next/link";
 import { useState } from "react";
 
-export function GuestHeader({ page }: { page?: "home" | "booking" }) {
+function AccountLinkLabel() {
+  const { pending } = useLinkStatus();
+  return pending ? <span role="status">Загружаем кабинет…</span> : "Личный кабинет";
+}
+
+export function GuestHeader({ page }: { page?: "home" | "booking" | "account" }) {
   const [open, setOpen] = useState(false);
 
   return (
@@ -22,7 +27,7 @@ export function GuestHeader({ page }: { page?: "home" | "booking" }) {
           Меню
         </button>
         <nav id="guest-navigation" className="guest-navigation" data-open={open} aria-label="Основная навигация">
-          <Link href="/account">Личный кабинет</Link>
+          <Link href="/account" aria-current={page === "account" ? "page" : undefined}><AccountLinkLabel /></Link>
           <Link href="/booking" aria-current={page === "booking" ? "page" : undefined}>
             Бронирование
           </Link>

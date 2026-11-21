@@ -635,3 +635,336 @@ body {
     grid-column: 1 / -1;
   }
 }
+
+.workspace {
+  padding-block: 32px 64px;
+  overflow-wrap: anywhere;
+}
+
+.workspace .guest-title {
+  font-size: clamp(2.25rem, 5vw, 3.25rem);
+}
+
+.workspace h2,
+.workspace h3,
+.confirm-dialog h3 {
+  color: var(--forest);
+  font: 600 2rem / 1.08 var(--heading-font);
+}
+
+.workspace h3,
+.confirm-dialog h3 {
+  font-size: 1.625rem;
+}
+
+.workspace-stack,
+.workspace-panel,
+.account-screen,
+.account-layout,
+.account-layout section {
+  display: grid;
+  align-content: start;
+  gap: 16px;
+  min-width: 0;
+}
+
+.workspace-panel {
+  padding: 16px;
+  border: 1px solid var(--divider);
+  border-radius: 8px;
+  background: var(--surface);
+}
+
+.workspace-muted,
+.workspace dt {
+  color: var(--muted);
+  font-size: .875rem;
+}
+
+.workspace-link {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  color: var(--forest);
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}
+
+.workspace-actions,
+.confirm-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.workspace-message:not(.guest-error) {
+  border-inline-start: 2px solid var(--forest);
+  padding: 12px 16px;
+  background: var(--green-tint);
+}
+
+.account-screen,
+.account-layout {
+  gap: 32px;
+}
+
+.account-heading,
+.admin-heading {
+  display: grid;
+  align-items: end;
+  gap: 12px;
+}
+
+.account-heading p,
+.admin-heading p {
+  color: var(--muted);
+}
+
+.account-layout .booking-card {
+  align-items: center;
+}
+
+.booking-card time,
+.account-notification-list time,
+.admin-table {
+  font-variant-numeric: tabular-nums;
+}
+
+.booking-status {
+  min-height: 24px;
+  font-size: .875rem;
+  padding-block: 2px;
+}
+
+.booking-status[data-status="completed"] {
+  color: var(--ink);
+}
+
+.account-notifications {
+  padding-top: 16px;
+  border-top: 1px solid var(--brass);
+}
+
+.account-notification-list li {
+  display: grid;
+  gap: 8px;
+  justify-items: start;
+  border-bottom: 1px solid var(--divider);
+  padding: 12px 0;
+}
+
+.account-action {
+  display: grid;
+  gap: 8px;
+  justify-items: start;
+  min-width: 0;
+}
+
+.confirm-dialog {
+  position: fixed;
+  inset: 0;
+  margin: auto;
+  width: min(100% - 32px, 480px);
+  max-height: calc(100% - 32px);
+  overflow: auto;
+  overflow-wrap: anywhere;
+  border: 1px solid var(--control-border);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--ink);
+  padding: 24px;
+}
+
+.confirm-dialog[open] {
+  display: grid;
+  gap: 16px;
+}
+
+.confirm-dialog::backdrop {
+  background: rgb(27 27 27 / 55%);
+}
+
+.workspace .button-danger {
+  color: var(--error);
+  border-color: var(--error);
+}
+
+.workspace .button-danger:hover:not(:disabled) {
+  background: var(--error-tint);
+}
+
+.admin-header {
+  border-bottom: 1px solid var(--divider);
+}
+
+.admin-header > div {
+  display: flex;
+  min-height: 56px;
+  gap: 8px 24px;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.admin-screen {
+  display: grid;
+  gap: 24px;
+}
+
+.admin-nav {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: stretch;
+  gap: 4px 16px;
+  border-bottom: 1px solid var(--divider);
+}
+
+.admin-nav a {
+  display: flex;
+  min-height: 44px;
+  align-items: center;
+  color: var(--forest);
+  border-bottom: 2px solid transparent;
+  font-size: .875rem;
+}
+
+.admin-nav a[aria-current="page"] {
+  border-color: var(--forest);
+  font-weight: 700;
+}
+
+.admin-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  align-items: end;
+}
+
+.admin-filters label,
+.admin-change label {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.admin-filters label {
+  flex: 1 1 150px;
+}
+
+.admin-screen :is(input, select, textarea) {
+  min-width: 0;
+  width: 100%;
+  min-height: 44px;
+  padding: 6px 10px;
+  border: 1px solid var(--control-border);
+  border-radius: 6px;
+  background: var(--surface);
+  color: var(--ink);
+}
+
+.admin-change {
+  max-width: 480px;
+}
+
+.admin-change .button {
+  justify-self: start;
+}
+
+.admin-table-scroll {
+  overflow-x: auto;
+  border: 1px solid var(--divider);
+  border-radius: 6px;
+  background: var(--surface);
+}
+
+.admin-table {
+  width: 100%;
+  min-width: 34rem;
+  border-collapse: collapse;
+  text-align: left;
+  font-size: .875rem;
+}
+
+.admin-table th,
+.admin-table td {
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--divider);
+  vertical-align: middle;
+}
+
+.admin-table th {
+  color: var(--forest);
+  background: var(--ivory);
+}
+
+.admin-table tr:last-child td {
+  border-bottom: 0;
+}
+
+.admin-table tr[data-selected="true"] {
+  background: var(--green-tint);
+}
+
+.admin-table td {
+  max-width: 24rem;
+  height: 48px;
+}
+
+.booking-detail-grid,
+.audit-snapshots {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 10rem), 1fr));
+  gap: 12px;
+}
+
+.audit-details summary {
+  min-height: 44px;
+  align-content: center;
+  color: var(--forest);
+  cursor: pointer;
+}
+
+.audit-details > p,
+.audit-snapshots {
+  margin-block: 8px;
+}
+
+@media (min-width: 768px) {
+  .workspace {
+    padding-top: 48px;
+  }
+
+  .account-heading,
+  .admin-heading {
+    grid-template-columns: 1fr auto;
+  }
+
+  .account-layout {
+    grid-template-columns: minmax(0, 5fr) minmax(0, 3fr);
+    gap: 48px;
+  }
+
+  .workspace-panel {
+    padding: 24px;
+  }
+
+  .admin-header > div {
+    min-height: 64px;
+  }
+
+  .admin-filters label {
+    flex: 0 1 auto;
+  }
+
+  .admin-filters input[type="number"] {
+    width: 88px;
+  }
+
+  .admin-screen .button,
+  .admin-screen :is(input, select, textarea),
+  .audit-details summary {
+    min-height: 36px;
+  }
+}

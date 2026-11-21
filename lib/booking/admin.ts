@@ -4,6 +4,7 @@ import { BookingStatus } from "../../prisma/generated/client/enums";
 import { canAccessAdministration } from "../auth/permissions";
 import { findSessionUser } from "../auth/service";
 import { getPrisma } from "../db";
+import { adminBookingTransitions } from "./admin-transitions";
 import { restaurantTimeZone } from "./calendar";
 import { bookingTransaction } from "./transaction";
 
@@ -59,27 +60,6 @@ export async function findAdminBooking(id: string) {
   return booking ? { status: "ok", booking } as const : { status: "not_found" } as const;
 }
 
-type Change = z.output<typeof statusChange>;
-
-function transitionAllowed(booking: {
-  status: BookingStatus;
-  startsAt: Date;
-  endsAt: Date;
-}, change: Change, now: Date) {
-  if (booking.status !== "pending" && booking.status !== "confirmed") return false;
-
-  switch (change.status) {
-    case "confirmed":
-      return booking.status === "pending" && now < booking.startsAt;
-    case "cancelled":
-      return now < booking.startsAt && Boolean(change.reason);
-    case "completed":
-      return now > booking.endsAt && (booking.status === "confirmed" || Boolean(change.reason));
-    case "no_show":
-      return now > booking.endsAt;
-  }
-}
-
 export async function changeAdminBookingStatus(token: string | undefined, id: string, input: unknown) {
   if (!token) return { status: "unauthorized" } as const;
 
@@ -99,7 +79,8 @@ export async function changeAdminBookingStatus(token: string | undefined, id: st
     });
     if (!booking) return { status: "not_found" } as const;
     if (booking.status !== change.expectedStatus) return { status: "concurrent_change" } as const;
-    if (!transitionAllowed(booking, change, new Date())) return { status: "invalid_transition" } as const;
+    const transition = adminBookingTransitions(booking, new Date()).find(({ status }) => status === change.status);
+    if (!transition || (transition.requiresReason && !change.reason)) return { status: "invalid_transition" } as const;
 
     const { status, reason } = change;
     const update = await tx.booking.updateMany({

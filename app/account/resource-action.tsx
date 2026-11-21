@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
+import { ConfirmDialog, ResultMessage } from "../../components/confirm-dialog";
 import { apiError } from "../booking/http-error";
 
 const actions = {
@@ -16,7 +17,6 @@ export function ResourceAction({ id, kind }: { id: string; kind: keyof typeof ac
   const action = actions[kind];
 
   function submit() {
-    if (kind === "cancel" && !window.confirm("Отменить это бронирование?")) return;
     setError("");
     startTransition(async () => {
       try {
@@ -33,9 +33,18 @@ export function ResourceAction({ id, kind }: { id: string; kind: keyof typeof ac
   }
 
   return (
-    <div className="auth-form">
-      <button type="button" disabled={pending} onClick={submit}>{pending ? action.pending : action.label}</button>
-      {error && <p role="alert">{error}</p>}
+    <div className="account-action">
+      {kind === "cancel" ? (
+        <ConfirmDialog trigger={pending ? action.pending : action.label} title="Отменить бронирование?"
+          description="Бронь останется в истории со статусом «Отменена»." confirm="Отменить бронь"
+          pending={pending} onConfirm={submit} danger />
+      ) : (
+        <button className="button button-secondary" type="button" disabled={pending} onClick={submit}>
+          {pending ? action.pending : action.label}
+        </button>
+      )}
+      {pending && <p className="sr-only" role="status">{action.pending}</p>}
+      {error && <ResultMessage error>{error}</ResultMessage>}
     </div>
   );
 }

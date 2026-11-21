@@ -1,5 +1,6 @@
 const dayMs = 86_400_000;
 const slotMinutes = 90;
+export const restaurantWindowStarts = ["12:00", "13:30", "15:00", "16:30", "18:00", "19:30"] as const;
 const minuteMs = 60_000;
 type Interval = { startsAt: Date; endsAt: Date };
 
@@ -59,7 +60,7 @@ export function restaurantWindows(date: string, timeZone: string) {
   const closing = toInstant(`${date}T21:00:00`, formatter);
   if (!closing) return null;
 
-  return ["12:00", "13:30", "15:00", "16:30", "18:00", "19:30"].flatMap(
+  return restaurantWindowStarts.flatMap(
     (time): Interval[] => {
       const startsAt = toInstant(`${date}T${time}:00`, formatter);
       if (!startsAt) return [];
