@@ -53,11 +53,15 @@ export async function loginUser({ email, password }: z.infer<typeof credentialsS
   return { token, expiresAt };
 }
 
-export async function findSessionUser(token: string | undefined) {
+export async function findSessionUser(
+  token: string | undefined,
+  tx?: Prisma.TransactionClient,
+  now = new Date(),
+) {
   if (!isSessionToken(token)) return null;
 
-  const session = await getPrisma().session.findUnique({
-    where: { tokenHash: hashToken(token), expiresAt: { gt: new Date() } },
+  const session = await (tx ?? getPrisma()).session.findUnique({
+    where: { tokenHash: hashToken(token), expiresAt: { gt: now } },
     select: { user: { select: { id: true, email: true, role: true } } },
   });
   return session?.user ?? null;

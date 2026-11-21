@@ -5,10 +5,14 @@ const secure = process.env.NODE_ENV === "production";
 const cookieName = secure ? "__Host-verde_session" : "verde_session";
 const cookieOptions = { httpOnly: true, sameSite: "lax", secure, path: "/" } as const;
 
+export async function currentSessionToken() {
+  return (await cookies()).get(cookieName)?.value;
+}
+
 export async function currentUser() {
-  const cookieStore = await cookies();
+  const token = await currentSessionToken();
   try {
-    return await findSessionUser(cookieStore.get(cookieName)?.value);
+    return await findSessionUser(token);
   } catch {
     throw new Error("Не удалось проверить сессию.");
   }

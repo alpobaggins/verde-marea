@@ -18,6 +18,16 @@ type Availability =
   | { status: "available"; slots: Slot[] }
   | { status: "invalid_input" | "outside_horizon" | "closed" | "no_availability"; slots: [] };
 
+export const activeBookingStatuses = ["pending", "confirmed"] as const;
+
+export function overlappingBookings({ startsAt, endsAt }: Interval) {
+  return {
+    startsAt: { lt: endsAt },
+    endsAt: { gt: startsAt },
+    status: { in: [...activeBookingStatuses] },
+  };
+}
+
 function overlaps(left: Interval, right: Interval) {
   return left.startsAt < right.endsAt && right.startsAt < left.endsAt;
 }
@@ -73,10 +83,10 @@ export async function calculateAvailability(
   );
   if (windows.length === 0) return { status: "no_availability", slots: [] };
 
-  const range = {
-    startsAt: { lt: windows[windows.length - 1].endsAt },
-    endsAt: { gt: windows[0].startsAt },
-  };
+  const { status, ...range } = overlappingBookings({
+    startsAt: windows[0].startsAt,
+    endsAt: windows[windows.length - 1].endsAt,
+  });
 
   async function readAvailability(db: Prisma.TransactionClient): Promise<Availability> {
     const closures = await db.availabilityClosure.findMany({
@@ -94,7 +104,7 @@ export async function calculateAvailability(
       select: {
         id: true,
         bookings: {
-          where: { ...range, status: { in: ["pending", "confirmed"] } },
+          where: { ...range, status },
           select: { startsAt: true, endsAt: true },
         },
       },
