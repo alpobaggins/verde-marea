@@ -1,6 +1,7 @@
 import { z } from "zod";
 import type { Prisma } from "../../prisma/generated/client/client";
 import { getPrisma } from "../db";
+import { bookingDateRange, restaurantTimeZone } from "./calendar";
 
 export const availabilityInput = z.object({
   date: z.iso.date(),
@@ -9,7 +10,6 @@ export const availabilityInput = z.object({
 
 const slotMinutes = 90;
 const minuteMs = 60_000;
-const dayMs = 24 * 60 * minuteMs;
 
 type Interval = { startsAt: Date; endsAt: Date };
 type Slot = Interval & { tableId: string };
@@ -57,17 +57,15 @@ export async function calculateAvailability(
   const parsed = availabilityInput.safeParse(input);
   if (!parsed.success) return { status: "invalid_input", slots: [] };
   const { date, guests } = parsed.data;
-  const timeZone = process.env.RESTAURANT_TIME_ZONE ?? "Europe/Moscow";
+  const timeZone = restaurantTimeZone();
   const formatter = new Intl.DateTimeFormat("sv-SE", {
     timeZone, year: "numeric", month: "2-digit", day: "2-digit",
     hour: "2-digit", minute: "2-digit", second: "2-digit", hourCycle: "h23",
   });
-  const today = localDateTime(now, formatter).slice(0, 10);
-  // UTC arithmetic here represents calendar dates, independently of the process TZ.
-  const calendarDay = new Date(`${date}T00:00:00Z`);
-  const dayOffset = (+calendarDay - Date.parse(`${today}T00:00:00Z`)) / dayMs;
+  const { first, last } = bookingDateRange(now, timeZone);
+  if (date < first || date > last) return { status: "outside_horizon", slots: [] };
 
-  if (dayOffset < 0 || dayOffset > 13) return { status: "outside_horizon", slots: [] };
+  const calendarDay = new Date(`${date}T00:00:00Z`);
   if (calendarDay.getUTCDay() === 1) return { status: "closed", slots: [] };
 
   const closing = toInstant(`${date}T21:00:00`, formatter);

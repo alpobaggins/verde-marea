@@ -6,18 +6,19 @@ import { AuthForm } from "../auth-form";
 export default async function LoginPage({
   searchParams,
 }: {
-  searchParams: Promise<{ registered?: string }>;
+  searchParams: Promise<{ registered?: string; next?: string }>;
 }) {
-  if (await currentUser()) redirect("/account");
-  const { registered } = await searchParams;
+  const { registered, next } = await searchParams;
+  const returnToBooking = next === "booking";
+  if (await currentUser()) redirect(returnToBooking ? "/booking" : "/account");
 
   return (
     <main className="auth-page">
       <Link href="/">Verde Marea</Link>
       <h1>Вход</h1>
       {registered === "1" && <p role="status">Аккаунт создан. Войдите с вашим email и паролем.</p>}
-      <AuthForm />
-      <Link href="/register">Зарегистрироваться</Link>
+      <AuthForm returnToBooking={returnToBooking} />
+      <Link href={returnToBooking ? "/register?next=booking" : "/register"}>Зарегистрироваться</Link>
     </main>
   );
 }

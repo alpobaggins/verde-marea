@@ -10,7 +10,7 @@ const loginError = "Неверный email или пароль.";
 const retryError = "Не удалось выполнить действие. Попробуйте ещё раз.";
 
 export async function register(_state: AuthFormState, form: FormData): Promise<AuthFormState> {
-  if (await currentUser()) redirect("/account");
+  if (await currentUser()) redirect(form.get("next") === "booking" ? "/booking" : "/account");
 
   const parsed = registrationSchema.safeParse({
     name: form.get("name"),
@@ -26,11 +26,11 @@ export async function register(_state: AuthFormState, form: FormData): Promise<A
   } catch {
     return { error: retryError };
   }
-  redirect("/login?registered=1");
+  redirect(form.get("next") === "booking" ? "/login?registered=1&next=booking" : "/login?registered=1");
 }
 
 export async function login(_state: AuthFormState, form: FormData): Promise<AuthFormState> {
-  if (await currentUser()) redirect("/account");
+  if (await currentUser()) redirect(form.get("next") === "booking" ? "/booking" : "/account");
 
   const parsed = credentialsSchema.safeParse({
     email: form.get("email"),
@@ -45,7 +45,7 @@ export async function login(_state: AuthFormState, form: FormData): Promise<Auth
   } catch {
     return { error: retryError };
   }
-  redirect("/account");
+  redirect(form.get("next") === "booking" ? "/booking" : "/account");
 }
 
 export async function logout(): Promise<AuthFormState> {

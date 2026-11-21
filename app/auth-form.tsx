@@ -10,7 +10,9 @@ const fields = [
   { name: "password", label: "Пароль", type: "password", autoComplete: "current-password" },
 ] as const;
 
-export function AuthForm({ registration = false }: { registration?: boolean }) {
+export function AuthForm({ registration = false, returnToBooking = false }: {
+  registration?: boolean; returnToBooking?: boolean;
+}) {
   const [state, action, pending] = useActionState<AuthFormState, FormData>(
     registration ? register : login,
     {},
@@ -20,6 +22,7 @@ export function AuthForm({ registration = false }: { registration?: boolean }) {
 
   return (
     <form action={action} className="auth-form">
+      {returnToBooking && <input type="hidden" name="next" value="booking" />}
       {fields.filter((field) => registration || field.name !== "name").map((field) => {
         const errors = state.fields?.[field.name];
         const savedValue = field.name === "name"

@@ -10,7 +10,8 @@
     "typecheck": "prisma generate && next typegen && tsc --noEmit",
     "test:auth": "prisma generate && tsx --test tests/auth.test.ts",
     "test:availability": "prisma generate && tsx --test tests/availability.test.ts",
-    "test:booking": "prisma generate && tsx --test tests/booking.test.ts"
+    "test:booking": "prisma generate && tsx --test tests/booking.test.ts",
+    "test:account": "prisma generate && tsx --test tests/account.test.ts"
   },
   "dependencies": {
     "@prisma/adapter-pg": "7.10.1",

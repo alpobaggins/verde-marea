@@ -77,3 +77,122 @@ body {
   outline: 2px solid #1f4d3a;
   outline-offset: 2px;
 }
+
+.booking-page {
+  max-width: 780px;
+}
+
+.booking-page nav {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  column-gap: 24px;
+}
+
+.booking-page nav a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+}
+
+.booking-page h2,
+.booking-page h3 {
+  color: #1f4d3a;
+  font: 600 36px / 1.1 "Cormorant Garamond", Georgia, serif;
+}
+
+.booking-page h3 {
+  font-size: 30px;
+}
+
+.booking-page section {
+  display: grid;
+  gap: 12px;
+}
+
+.booking-page [role="alert"] {
+  color: #8a302d;
+}
+
+.booking-page [role="status"]:empty {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+}
+
+.booking-slots {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.booking-slots legend {
+  margin-bottom: 8px;
+}
+
+.booking-slots label {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  padding-inline: 12px;
+  border: 1px solid #827664;
+  border-radius: 6px;
+  background: #fbf8f2;
+  font-variant-numeric: tabular-nums;
+}
+
+.booking-slots input[type="radio"] {
+  width: auto;
+  min-height: auto;
+  margin: 0;
+  accent-color: #1f4d3a;
+}
+
+.booking-list {
+  display: grid;
+  gap: 8px;
+  padding: 0;
+  list-style: none;
+}
+
+.booking-card {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 16px;
+  border: 1px solid #ddd4c4;
+  border-radius: 8px;
+  background: #fbf8f2;
+}
+
+.booking-card time {
+  font-variant-numeric: tabular-nums;
+}
+
+.booking-status {
+  display: inline-block;
+  margin-top: 4px;
+  padding-inline: 8px;
+  border-radius: 4px;
+  background: #ede8de;
+  color: #57534a;
+}
+
+.booking-status[data-status="pending"] {
+  background: #f4e8cc;
+  color: #6b4c18;
+}
+
+.booking-status[data-status="confirmed"] {
+  background: #e3eee6;
+  color: #1f4d3a;
+}
+
+.booking-status[data-status="no_show"] {
+  background: #f7e5e1;
+  color: #8a302d;
+}
