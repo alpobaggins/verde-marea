@@ -13,7 +13,8 @@
     "test:booking": "prisma generate && tsx --test tests/booking.test.ts",
     "test:account": "prisma generate && tsx --test tests/account.test.ts",
     "test:admin-booking": "prisma generate && tsx --test tests/admin-booking.test.ts",
-    "test:admin-availability": "prisma generate && tsx --test tests/admin-availability.test.ts"
+    "test:admin-availability": "prisma generate && tsx --test tests/admin-availability.test.ts",
+    "test:admin-identity": "prisma generate && tsx --test tests/admin-identity.test.ts"
   },
   "dependencies": {
     "@prisma/adapter-pg": "7.10.1",
