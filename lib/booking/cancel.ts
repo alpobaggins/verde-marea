@@ -1,28 +1,28 @@
 import { z } from "zod";
-import type { BookingStatus } from "../../prisma/generated/client/enums";
+import { BookingStatus } from "../../prisma/generated/client/enums";
 import { findSessionUser } from "../auth/service";
 import { activeBookingStatuses } from "./availability";
-import { bookingTransaction } from "./transaction";
+import { bookingTransaction, enforceBookingDeadline } from "./transaction";
 
 const cancellationNoticeMs = 3 * 60 * 60 * 1_000;
 const bookingIdSchema = z.uuid();
+const cancelBookingInput = z.strictObject({ expectedStatus: z.enum(BookingStatus) });
 
 export function cancellationDeadlineMet(startsAt: Date, now: Date) {
   return startsAt.getTime() - now.getTime() >= cancellationNoticeMs;
 }
 
-export async function cancelBooking(token: string | undefined, id: string, hasUnexpectedInput: boolean) {
+export async function cancelBooking(token: string | undefined, id: string, input: unknown) {
   if (!token) return { status: "unauthorized" } as const;
-
-  // Keep the first eligible status across retries so they cannot cancel a newer version.
-  let expectedStatus: BookingStatus | undefined;
 
   return bookingTransaction(async (tx) => {
     const user = await findSessionUser(token, tx);
     if (!user) return { status: "unauthorized" } as const;
-    if (hasUnexpectedInput || !bookingIdSchema.safeParse(id).success) {
+    const parsed = cancelBookingInput.safeParse(input);
+    if (!parsed.success || !bookingIdSchema.safeParse(id).success) {
       return { status: "invalid_input" } as const;
     }
+    const { expectedStatus } = parsed.data;
 
     const booking = await tx.booking.findUnique({
       where: { id_userId: { id, userId: user.id } },
@@ -30,7 +30,7 @@ export async function cancelBooking(token: string | undefined, id: string, hasUn
     });
     if (!booking) return { status: "not_found" } as const;
 
-    if (expectedStatus !== undefined && booking.status !== expectedStatus) {
+    if (booking.status !== expectedStatus) {
       return { status: "concurrent_change" } as const;
     }
     if (!activeBookingStatuses.some((status) => status === booking.status)) {
@@ -40,7 +40,6 @@ export async function cancelBooking(token: string | undefined, id: string, hasUn
       return { status: "too_late" } as const;
     }
 
-    expectedStatus = booking.status;
     const status = "cancelled";
     const update = await tx.booking.updateMany({
       where: { id: booking.id, userId: user.id, status: expectedStatus },
@@ -62,6 +61,7 @@ export async function cancelBooking(token: string | undefined, id: string, hasUn
         after: { status },
       },
     });
+    enforceBookingDeadline(cancellationDeadlineMet(booking.startsAt, new Date()));
     return { status: "cancelled", booking: { ...booking, status } } as const;
-  });
+  }, { status: "too_late" } as const);
 }

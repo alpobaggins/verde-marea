@@ -8,6 +8,7 @@
     "start": "next start",
     "lint": "eslint .",
     "typecheck": "prisma generate && next typegen && tsc --noEmit",
+    "test:strict": "node scripts/test-strict.mjs",
     "test:auth": "prisma generate && tsx --test tests/auth.test.ts",
     "test:availability": "prisma generate && tsx --test tests/availability.test.ts",
     "test:booking": "prisma generate && tsx --test tests/booking.test.ts",

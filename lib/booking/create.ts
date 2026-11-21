@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { findSessionUser } from "../auth/service";
 import { availabilityInput, calculateAvailability, overlappingBookings } from "./availability";
-import { bookingTransaction } from "./transaction";
+import { bookingTransaction, enforceBookingDeadline } from "./transaction";
 
 export const createBookingInput = availabilityInput.extend({
   startsAt: z.iso.datetime().refine((value) => !/\.\d{4}/.test(value)),
@@ -60,6 +60,7 @@ export async function createBooking(token: string | undefined, body: unknown) {
       },
     });
 
+    enforceBookingDeadline(booking.startsAt > new Date());
     return { status: "created", booking } as const;
-  });
+  }, { status: "unavailable" } as const);
 }

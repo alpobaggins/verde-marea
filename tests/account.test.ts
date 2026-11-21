@@ -149,8 +149,12 @@ test("protected account and notifications throughout the booking lifecycle", {
         };
         assert.ok(!(await getSlots()).includes(startsAt));
         const cancelPath = `/api/bookings/${booking.id}/cancel`;
-        assert.equal((await request(cancelPath, other.token, { method: "PATCH" })).status, 404);
-        assert.equal((await request(cancelPath, owner.token, { method: "PATCH" })).status, 200);
+        const cancelConfirmed = {
+          method: "PATCH", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ expectedStatus: "confirmed" }),
+        };
+        assert.equal((await request(cancelPath, other.token, cancelConfirmed)).status, 404);
+        assert.equal((await request(cancelPath, owner.token, cancelConfirmed)).status, 200);
         const html = await accountHtml(owner.token);
         const [, history] = html.split('id="history-heading"');
         assert.match(history.split('id="notifications-heading"')[0], /data-status="cancelled">Отменена/);
@@ -166,7 +170,10 @@ test("protected account and notifications throughout the booking lifecycle", {
         const upcoming = (await accountHtml(owner.token)).split('id="history-heading"')[0];
         assert.match(upcoming, /Отмена доступна не позднее чем за три часа/);
         assert.doesNotMatch(upcoming, /Отменить бронь/);
-        const rejected = await request(`/api/bookings/${late.id}/cancel`, owner.token, { method: "PATCH" });
+        const rejected = await request(`/api/bookings/${late.id}/cancel`, owner.token, {
+          method: "PATCH", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ expectedStatus: "pending" }),
+        });
         assert.equal(rejected.status, 400);
         assert.deepEqual(await rejected.json(), {
           error: "Отменить бронирование можно не позднее чем за три часа до начала.",

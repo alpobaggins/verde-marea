@@ -1,13 +1,14 @@
 import assert from "node:assert/strict";
 import { createHash, randomBytes, randomUUID } from "node:crypto";
 import { setTimeout as delay } from "node:timers/promises";
-import { test } from "node:test";
+import { test, type TestContext } from "node:test";
 import type { Prisma } from "../prisma/generated/client/client";
 import type { BookingStatus } from "../prisma/generated/client/enums";
 import { getPrisma } from "../lib/db";
+import { changeAdminBookingStatus } from "../lib/booking/admin";
 import { overlappingBookings } from "../lib/booking/availability";
-import { cancellationDeadlineMet } from "../lib/booking/cancel";
-import { createBookingInput } from "../lib/booking/create";
+import { cancellationDeadlineMet, cancelBooking } from "../lib/booking/cancel";
+import { createBooking, createBookingInput } from "../lib/booking/create";
 
 const dbUrl = process.env.BOOKING_TEST_DATABASE_URL;
 const appUrl = process.env.BOOKING_TEST_APP_URL;
@@ -336,16 +337,132 @@ test("booking HTTP API and Serializable PostgreSQL writes", {
         }
       });
 
+      await t.test("booking write deadlines with a controlled clock and PostgreSQL locks", async (deadlineTests) => {
+        await clearBookings();
+        const start = Date.parse(startsAt);
+        const cancellationDeadline = start - 3 * 60 * 60_000;
+        await prisma.session.updateMany({
+          where: { userId: { in: [owner.id, other.id] } },
+          data: { expiresAt: new Date(endsAt) },
+        });
+
+        const counts = () => Promise.all([prisma.booking.count(), prisma.auditLog.count(), prisma.notification.count()]);
+        const pending = () => prisma.booking.create({ data: {
+          userId: other.id, tableId: primary.id, guestCount: 2,
+          startsAt: new Date(startsAt), endsAt: new Date(endsAt),
+        } });
+
+        async function crossDeadline<T>(
+          context: TestContext, deadline: number, table: "Booking" | "AuditLog", operation: () => Promise<T>,
+        ) {
+          context.mock.timers.enable({ apis: ["Date"], now: deadline - 1 });
+          let running: Promise<T> | undefined;
+          try {
+            await prisma.$transaction(async (tx) => {
+              if (table === "Booking") {
+                await tx.$executeRaw`LOCK TABLE "Booking" IN SHARE MODE`;
+              } else {
+                await tx.$executeRaw`LOCK TABLE "AuditLog" IN SHARE MODE`;
+              }
+              running = operation();
+              for (let attempt = 0; attempt < 100; attempt++) {
+                await tx.$executeRaw`SELECT pg_stat_clear_snapshot()`;
+                const [{ waiting }] = await tx.$queryRaw<{ waiting: boolean }[]>`
+                  SELECT EXISTS (
+                    SELECT 1 FROM pg_stat_activity
+                    WHERE datname = current_database() AND wait_event_type = 'Lock'
+                      AND pg_backend_pid() = ANY (pg_blocking_pids(pid))
+                  ) AS waiting
+                `;
+                if (waiting) {
+                  context.mock.timers.setTime(deadline + 1);
+                  return;
+                }
+                await delay(20);
+              }
+              assert.fail(`Expected the operation to wait for the ${table} lock.`);
+            });
+          } finally {
+            if (running) await Promise.allSettled([running]);
+          }
+          assert.ok(running);
+          return running;
+        }
+
+        await deadlineTests.test("creation rejects at the exact slot start", async (boundaryTest) => {
+          boundaryTest.mock.timers.enable({ apis: ["Date"], now: start });
+          assert.equal((await createBooking(other.token, input)).status, "unavailable");
+          assert.deepEqual(await counts(), [0, 0, 0]);
+        });
+
+        await deadlineTests.test("creation rolls back when its insert crosses the slot start", async (lockTest) => {
+          try {
+            const result = await crossDeadline(lockTest, start, "Booking", () => createBooking(other.token, input));
+            assert.equal(result.status, "unavailable");
+            assert.deepEqual(await counts(), [0, 0, 0]);
+          } finally {
+            await clearBookings();
+          }
+        });
+
+        await deadlineTests.test("creation rolls back when the audit write crosses the slot start", async (lockTest) => {
+          try {
+            const result = await crossDeadline(lockTest, start, "AuditLog", () => createBooking(other.token, input));
+            assert.equal(result.status, "unavailable");
+            assert.deepEqual(await counts(), [0, 0, 0]);
+          } finally {
+            await clearBookings();
+          }
+        });
+
+        await deadlineTests.test("owner cancellation rejects after waiting past the cutoff and succeeds at it", async (lockTest) => {
+          const booking = await pending();
+          const cancel = () => cancelBooking(other.token, booking.id, { expectedStatus: "pending" });
+          try {
+            assert.equal((await crossDeadline(lockTest, cancellationDeadline, "Booking", cancel)).status, "too_late");
+            assert.deepEqual(await prisma.booking.findUniqueOrThrow({ where: { id: booking.id } }), booking);
+            assert.deepEqual(await counts(), [1, 0, 0]);
+
+            lockTest.mock.timers.setTime(cancellationDeadline);
+            assert.equal((await cancel()).status, "cancelled");
+            assert.deepEqual(await counts(), [1, 1, 1]);
+          } finally {
+            await clearBookings();
+          }
+        });
+
+        await deadlineTests.test("administrative confirmation rejects at the start and after waiting past it", async (lockTest) => {
+          const booking = await pending();
+          const confirm = () => changeAdminBookingStatus(owner.token, booking.id, {
+            expectedStatus: "pending", status: "confirmed",
+          });
+          try {
+            assert.equal((await crossDeadline(lockTest, start, "Booking", confirm)).status, "invalid_transition");
+            assert.deepEqual(await prisma.booking.findUniqueOrThrow({ where: { id: booking.id } }), booking);
+            assert.deepEqual(await counts(), [1, 0, 0]);
+
+            lockTest.mock.timers.setTime(start);
+            assert.equal((await confirm()).status, "invalid_transition");
+            assert.deepEqual(await counts(), [1, 0, 0]);
+          } finally {
+            await clearBookings();
+          }
+        });
+      });
+
       await t.test("owner cancellation HTTP and Serializable PostgreSQL writes", async (cancelTests) => {
         await clearBookings();
         // Keep one candidate so the availability assertion proves this table was released.
         await prisma.table.deleteMany({ where: { id: { not: primary.id } } });
 
-        const patch = (id: string, token?: string, options: RequestInit = {}) =>
+        const patch = (id: string, token?: string, body: object | null = { expectedStatus: "pending" }) =>
           fetch(new URL(`/api/bookings/${id}/cancel`, appUrl), {
-            ...options,
             method: "PATCH",
-            headers: token ? { Cookie: `__Host-verde_session=${token}` } : {},
+            headers: {
+              ...(token ? { Cookie: `__Host-verde_session=${token}` } : {}),
+              ...(body ? { "Content-Type": "application/json" } : {}),
+            },
+            body: body ? JSON.stringify(body) : undefined,
           });
         const fixture = (status: BookingStatus, start = new Date(startsAt)) => prisma.booking.create({
           data: {
@@ -364,7 +481,6 @@ test("booking HTTP API and Serializable PostgreSQL writes", {
           assert.equal((await patch(booking.id)).status, 401);
           assert.equal((await patch(booking.id, randomBytes(32).toString("hex"))).status, 401);
           assert.equal((await patch("invalid", owner.token)).status, 400);
-          assert.equal((await patch(booking.id, other.token, { body: JSON.stringify({ userId: owner.id }) })).status, 400);
 
           const foreign = await patch(booking.id, other.token);
           const missing = await patch(randomUUID(), other.token);
@@ -372,6 +488,16 @@ test("booking HTTP API and Serializable PostgreSQL writes", {
           assert.equal(missing.status, foreign.status);
           assert.deepEqual(await foreign.json(), await missing.json());
           assert.deepEqual(await summary(booking.id), [{ status: "pending" }, 0, 0]);
+          await clearBookings();
+        });
+
+        await cancelTests.test("missing or invalid expected status is rejected without side effects", async () => {
+          const booking = await fixture("pending");
+          for (const body of [null, {}, { expectedStatus: "unknown" }, { expectedStatus: null },
+            { expectedStatus: "pending", userId: owner.id }]) {
+            assert.equal((await patch(booking.id, owner.token, body)).status, 400);
+            assert.deepEqual(await summary(booking.id), [{ status: "pending" }, 0, 0]);
+          }
           await clearBookings();
         });
 
@@ -394,7 +520,7 @@ test("booking HTTP API and Serializable PostgreSQL writes", {
           assert.equal(notification.recipientId, owner.id);
           assert.equal(notification.status, "cancelled");
 
-          assert.equal((await patch(booking.id, owner.token)).status, 400);
+          assert.equal((await patch(booking.id, owner.token)).status, 409);
           assert.deepEqual(await summary(booking.id), [{ status: "cancelled" }, 1, 1]);
           const replacement = await post(other.token);
           assert.equal(replacement.status, 201);
@@ -405,13 +531,13 @@ test("booking HTTP API and Serializable PostgreSQL writes", {
 
         await cancelTests.test("confirmed can be cancelled; terminal states and late cancellations are rejected", async () => {
           const confirmed = await fixture("confirmed", new Date(Date.now() + 181 * 60_000));
-          assert.equal((await patch(confirmed.id, owner.token)).status, 200);
+          assert.equal((await patch(confirmed.id, owner.token, { expectedStatus: "confirmed" })).status, 200);
           const late = await fixture("pending", new Date(Date.now() + 179 * 60_000));
           assert.equal((await patch(late.id, owner.token)).status, 400);
           assert.deepEqual(await summary(late.id), [{ status: "pending" }, 0, 0]);
           for (const status of ["cancelled", "completed", "no_show"] as const) {
             const booking = await fixture(status);
-            assert.equal((await patch(booking.id, owner.token)).status, 400);
+            assert.equal((await patch(booking.id, owner.token, { expectedStatus: status })).status, 400);
             assert.deepEqual(await summary(booking.id), [{ status }, 0, 0]);
           }
           await clearBookings();
@@ -421,14 +547,14 @@ test("booking HTTP API and Serializable PostgreSQL writes", {
           const booking = await fixture("confirmed");
           await prisma.$executeRaw`ALTER TABLE "AuditLog" ADD CONSTRAINT test_reject_cancel_audit CHECK (false)`;
           try {
-            const response = await patch(booking.id, owner.token);
+            const response = await patch(booking.id, owner.token, { expectedStatus: "confirmed" });
             assert.equal(response.status, 500);
             assert.deepEqual(await response.json(), { error: "Не удалось отменить бронирование." });
             assert.deepEqual(await summary(booking.id), [{ status: "confirmed" }, 0, 0]);
           } finally {
             await prisma.$executeRaw`ALTER TABLE "AuditLog" DROP CONSTRAINT test_reject_cancel_audit`;
           }
-          assert.equal((await patch(booking.id, owner.token)).status, 200);
+          assert.equal((await patch(booking.id, owner.token, { expectedStatus: "confirmed" })).status, 200);
           await clearBookings();
         });
 
@@ -475,7 +601,7 @@ test("booking HTTP API and Serializable PostgreSQL writes", {
           const [response] = await raceCancellation(booking.id, 1, true);
           assert.equal(response.status, 409);
           assert.deepEqual(await summary(booking.id), [{ status: "confirmed" }, 0, 0]);
-          assert.equal((await patch(booking.id, owner.token)).status, 200);
+          assert.equal((await patch(booking.id, owner.token, { expectedStatus: "confirmed" })).status, 200);
           assert.deepEqual(await summary(booking.id), [{ status: "cancelled" }, 1, 1]);
           await clearBookings();
         });

@@ -113,7 +113,7 @@ export function BookingForm({ first, last, timeZone, signedIn }: {
         <button className="button" disabled={Boolean(pending)}>
           <span className="button-label">
             <span aria-hidden={pending === "search"}>Найти свободное время</span>
-            {pending === "search" && <span className="button-busy-label">Поиск…</span>}
+            {pending === "search" && <span>Поиск…</span>}
           </span>
         </button>
       </form>
@@ -157,7 +157,7 @@ export function BookingForm({ first, last, timeZone, signedIn }: {
             : <button className="button" disabled={Boolean(pending) || !selected}>
                 <span className="button-label">
                   <span aria-hidden={pending === "book"}>Забронировать</span>
-                  {pending === "book" && <span className="button-busy-label">Отправка…</span>}
+                  {pending === "book" && <span>Отправка…</span>}
                 </span>
               </button>}
         </form>

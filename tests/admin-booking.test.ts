@@ -198,6 +198,15 @@ test("administrative bookings HTTP API on PostgreSQL", {
     }
   });
 
+  await t.test("rejects a null character in the reason without side effects", async () => {
+    const booking = await future();
+    const response = await update(booking.id, admin.token, {
+      expectedStatus: "pending", status: "cancelled", reason: "Invalid\0reason",
+    });
+    assert.equal(response.status, 400);
+    assert.deepEqual(await effects(booking.id), { status: "pending", audits: [], notifications: [] });
+  });
+
   await t.test("status changes respect the exact start and end of the booking", async (boundaryTest) => {
     const pending = await future();
     const endCases = [
@@ -288,7 +297,7 @@ test("administrative bookings HTTP API on PostgreSQL", {
     const booking = await future();
     const responses = await race(booking.id, [
       () => update(booking.id, admin.token),
-      () => request(`/api/bookings/${booking.id}/cancel`, owner.token, undefined, "PATCH"),
+      () => request(`/api/bookings/${booking.id}/cancel`, owner.token, { expectedStatus: "pending" }),
     ]);
     assert.deepEqual(responses.map((r) => r.status).sort(), [200, 409]);
     const result = await effects(booking.id);
@@ -297,5 +306,38 @@ test("administrative bookings HTTP API on PostgreSQL", {
     assert.equal(result.notifications.length, 1);
     assert.equal(result.notifications[0].status, result.status);
     assert.equal(result.audits[0].actorId, responses[0].ok ? admin.id : owner.id);
+  });
+
+  await t.test("owner cancellation rejects a stale account card after administrative confirmation", async () => {
+    const booking = await future();
+    const cancelPath = `/api/bookings/${booking.id}/cancel`;
+    async function cardStatus() {
+      const page = await request("/account", owner.token);
+      assert.equal(page.status, 200);
+      const cards = (await page.text()).match(/<li class="booking-card">[\s\S]*?<\/li>/g) ?? [];
+      const card = cards.find((html) => html.includes(booking.startsAt.toISOString()));
+      return card?.match(/data-status="([^"]+)"/)?.[1];
+    }
+
+    const staleStatus = await cardStatus();
+    assert.equal(staleStatus, "pending");
+    assert.equal((await update(booking.id, admin.token)).status, 200);
+    const confirmed = await effects(booking.id);
+    assert.equal(confirmed.status, "confirmed");
+    assert.equal(confirmed.audits.length, 1);
+    assert.equal(confirmed.notifications.length, 1);
+
+    const conflict = await request(cancelPath, owner.token, { expectedStatus: staleStatus });
+    assert.equal(conflict.status, 409);
+    assert.deepEqual(await effects(booking.id), confirmed);
+
+    const refreshedStatus = await cardStatus();
+    assert.equal(refreshedStatus, "confirmed");
+    assert.equal((await request(cancelPath, owner.token, { expectedStatus: refreshedStatus })).status, 200);
+    const cancelled = await effects(booking.id);
+    assert.equal(cancelled.status, "cancelled");
+    assert.equal(cancelled.audits.length, 2);
+    assert.deepEqual(cancelled.audits.find(({ actorId }) => actorId === owner.id)?.before, { status: "confirmed" });
+    assert.deepEqual(cancelled.notifications.map(({ status }) => status).sort(), ["cancelled", "confirmed"]);
   });
 });

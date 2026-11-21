@@ -48,6 +48,11 @@ test("administration and role changes follow the role matrix", () => {
 });
 
 const testDatabaseUrl = process.env.AUTH_TEST_DATABASE_URL;
+if (testDatabaseUrl) {
+  const database = new URL(testDatabaseUrl);
+  assert.match(database.pathname, /^\/verde_marea_[a-z_]*test$/);
+  assert.equal(database.search, "", "Use a test database URL without connection overrides.");
+}
 
 test("PostgreSQL registration, credentials and session lifecycle", {
   skip: testDatabaseUrl ? false : "Set AUTH_TEST_DATABASE_URL to a migrated test database.",

@@ -58,7 +58,7 @@ export function AuthForm({ registration = false, returnToBooking = false }: {
       <button className="button" disabled={pending}>
         <span className="button-label">
           <span aria-hidden={pending}>{registration ? "Зарегистрироваться" : "Войти"}</span>
-          {pending && <span className="button-busy-label">Отправка…</span>}
+          {pending && <span>Отправка…</span>}
         </span>
       </button>
     </form>

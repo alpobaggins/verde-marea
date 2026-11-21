@@ -7,7 +7,7 @@ import { restaurantTimeZone } from "../../lib/booking/calendar";
 import { bookingStatusLabels, formatBookingDate, formatBookingTime } from "../../lib/booking/display";
 import { readAccountNotifications } from "../../lib/notifications/service";
 import { LogoutForm } from "../auth-form";
-import { ResourceAction } from "./resource-action";
+import { BookingCancellationFeedback, ResourceAction } from "./resource-action";
 
 type AccountBooking = Awaited<ReturnType<typeof readAccountBookings>>["upcoming"][number];
 
@@ -26,7 +26,7 @@ function BookingList({ bookings, timeZone, upcoming }: {
             <p className="booking-status" data-status={booking.status}>{bookingStatusLabels[booking.status]}</p>
           </div>
           {booking.canCancel
-            ? <ResourceAction id={booking.id} kind="cancel" />
+            ? <ResourceAction id={booking.id} kind="cancel" expectedStatus={booking.status} />
             : upcoming && <p>Отмена доступна не позднее чем за три часа до начала.</p>}
         </li>
       ))}
@@ -61,18 +61,20 @@ export default async function AccountPage() {
           <section aria-labelledby="booking-heading">
             <h2 id="booking-heading">Мои бронирования</h2>
             <p>Время ресторана — {timeZone === "Europe/Moscow" ? "московское" : timeZone}.</p>
-            {!upcoming.length && !history.length ? <p>У вас пока нет бронирований.</p> : (
-              <>
-                <section aria-labelledby="upcoming-heading">
-                  <h3 id="upcoming-heading">Предстоящие и текущие</h3>
-                  <BookingList bookings={upcoming} timeZone={timeZone} upcoming />
-                </section>
-                <section aria-labelledby="history-heading">
-                  <h3 id="history-heading">История</h3>
-                  <BookingList bookings={history} timeZone={timeZone} />
-                </section>
-              </>
-            )}
+            <BookingCancellationFeedback>
+              {!upcoming.length && !history.length ? <p>У вас пока нет бронирований.</p> : (
+                <>
+                  <section aria-labelledby="upcoming-heading">
+                    <h3 id="upcoming-heading">Предстоящие и текущие</h3>
+                    <BookingList bookings={upcoming} timeZone={timeZone} upcoming />
+                  </section>
+                  <section aria-labelledby="history-heading">
+                    <h3 id="history-heading">История</h3>
+                    <BookingList bookings={history} timeZone={timeZone} />
+                  </section>
+                </>
+              )}
+            </BookingCancellationFeedback>
           </section>
           <section className="account-notifications" aria-labelledby="notifications-heading">
             <h2 id="notifications-heading">Уведомления</h2>

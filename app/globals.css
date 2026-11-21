@@ -96,50 +96,6 @@ body {
   outline-offset: 2px;
 }
 
-.booking-page {
-  max-width: 780px;
-}
-
-.booking-page nav {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  column-gap: 24px;
-}
-
-.booking-page nav a {
-  display: inline-flex;
-  align-items: center;
-  min-height: 44px;
-}
-
-.booking-page h2,
-.booking-page h3 {
-  color: var(--forest);
-  font: 600 36px / 1.1 var(--heading-font);
-}
-
-.booking-page h3 {
-  font-size: 30px;
-}
-
-.booking-page section {
-  display: grid;
-  gap: 12px;
-}
-
-.booking-page [role="alert"] {
-  color: var(--error);
-}
-
-.booking-page [role="status"]:empty {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  overflow: hidden;
-  clip-path: inset(50%);
-}
-
 .booking-list {
   display: grid;
   gap: 8px;
@@ -156,10 +112,6 @@ body {
   border: 1px solid var(--divider);
   border-radius: 8px;
   background: var(--surface);
-}
-
-.booking-card time {
-  font-variant-numeric: tabular-nums;
 }
 
 .booking-status {

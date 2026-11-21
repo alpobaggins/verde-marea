@@ -1,8 +1,9 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState, useTransition } from "react";
+import { createContext, useContext, useState, useTransition, type ReactNode } from "react";
 import { ConfirmDialog, ResultMessage } from "../../components/confirm-dialog";
+import type { BookingStatus } from "../../prisma/generated/client/enums";
 import { apiError } from "../booking/http-error";
 
 const actions = {
@@ -10,19 +11,51 @@ const actions = {
   read: { label: "Отметить прочитанным", pending: "Сохраняем…", path: "notifications", suffix: "read" },
 };
 
-export function ResourceAction({ id, kind }: { id: string; kind: keyof typeof actions }) {
+type ResourceActionProps = { id: string } & (
+  { kind: "cancel"; expectedStatus: BookingStatus } | { kind: "read" }
+);
+
+const CancellationConflict = createContext<((message: string) => void) | null>(null);
+
+export function BookingCancellationFeedback({ children }: { children: ReactNode }) {
+  const [conflict, setConflict] = useState("");
+
+  return (
+    <CancellationConflict value={setConflict}>
+      {conflict && <ResultMessage error>{conflict}</ResultMessage>}
+      {children}
+    </CancellationConflict>
+  );
+}
+
+export function ResourceAction(props: ResourceActionProps) {
+  const { id, kind } = props;
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState("");
+  const setConflict = useContext(CancellationConflict);
   const action = actions[kind];
 
   function submit() {
     setError("");
+    const options: RequestInit = { method: "PATCH" };
+    if (props.kind === "cancel") {
+      setConflict?.("");
+      options.headers = { "Content-Type": "application/json" };
+      options.body = JSON.stringify({ expectedStatus: props.expectedStatus });
+    }
+
     startTransition(async () => {
       try {
-        const response = await fetch(`/api/${action.path}/${id}/${action.suffix}`, { method: "PATCH" });
+        const response = await fetch(`/api/${action.path}/${id}/${action.suffix}`, options);
         if (!response.ok) {
-          setError(await apiError(response, "Не удалось выполнить действие. Попробуйте ещё раз."));
+          if (kind === "cancel" && response.status === 409) {
+            const message = await apiError(response, "Состояние бронирования изменилось.");
+            (setConflict ?? setError)(message);
+            router.refresh();
+          } else {
+            setError(await apiError(response, "Не удалось выполнить действие. Попробуйте ещё раз."));
+          }
           return;
         }
         router.refresh();

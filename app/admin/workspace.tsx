@@ -53,7 +53,7 @@ export function useAdminMutation(reload: () => void) {
   const [notice, setNotice] = useState<{ text: string; error?: boolean }>();
 
   async function change(path: string, method: "PATCH" | "POST" | "DELETE", body: object, success: string) {
-    if (inFlight.current) return false;
+    if (inFlight.current) return;
     inFlight.current = true;
     setPending(true);
     setNotice(undefined);
@@ -64,7 +64,7 @@ export function useAdminMutation(reload: () => void) {
       if (response.ok) {
         setNotice({ text: success });
         reload();
-        return true;
+        return;
       }
       const message = await apiError(response, "Не удалось сохранить изменения.");
       const conflict = response.status === 409;
@@ -77,7 +77,6 @@ export function useAdminMutation(reload: () => void) {
       inFlight.current = false;
       setPending(false);
     }
-    return false;
   }
 
   return { pending, notice, change };

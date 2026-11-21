@@ -6,7 +6,7 @@ import { findSessionUser } from "../auth/service";
 import { getPrisma } from "../db";
 import { adminBookingTransitions } from "./admin-transitions";
 import { restaurantTimeZone } from "./calendar";
-import { bookingTransaction } from "./transaction";
+import { bookingTransaction, enforceBookingDeadline } from "./transaction";
 
 const bookingId = z.uuid();
 const filters = z.strictObject({
@@ -16,7 +16,7 @@ const filters = z.strictObject({
 const statusChange = z.strictObject({
   expectedStatus: z.enum(BookingStatus),
   status: z.enum(["confirmed", "cancelled", "completed", "no_show"]),
-  reason: z.string().trim().min(1).optional(),
+  reason: z.string().trim().min(1).refine((reason) => !reason.includes("\0")).optional(),
 });
 const bookingFields = {
   id: true,
@@ -103,6 +103,7 @@ export async function changeAdminBookingStatus(token: string | undefined, id: st
         reason,
       },
     });
+    if (status === "confirmed") enforceBookingDeadline(booking.startsAt > new Date());
     return { status: "ok", booking: { ...details, status } } as const;
-  });
+  }, { status: "invalid_transition" } as const);
 }
