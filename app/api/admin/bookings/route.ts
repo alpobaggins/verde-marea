@@ -1,6 +1,6 @@
 import { checkAdminAccess } from "../../../../lib/auth/access";
 import { listAdminBookings } from "../../../../lib/booking/admin";
-import { accessDenied, reply } from "./response";
+import { accessDenied, reply } from "../response";
 
 export async function GET(request: Request) {
   const access = await checkAdminAccess();

@@ -1,15 +1,12 @@
 import { z } from "zod";
 import type { Prisma } from "../../prisma/generated/client/client";
 import { getPrisma } from "../db";
-import { bookingDateRange, restaurantTimeZone } from "./calendar";
+import { bookingDateRange, restaurantTimeZone, restaurantWindows } from "./calendar";
 
 export const availabilityInput = z.object({
   date: z.iso.date(),
   guests: z.number().int().positive(),
 });
-
-const slotMinutes = 90;
-const minuteMs = 60_000;
 
 type Interval = { startsAt: Date; endsAt: Date };
 type Slot = Interval & { tableId: string };
@@ -32,24 +29,6 @@ function overlaps(left: Interval, right: Interval) {
   return left.startsAt < right.endsAt && right.startsAt < left.endsAt;
 }
 
-function localDateTime(instant: Date, formatter: Intl.DateTimeFormat) {
-  const parts = formatter.formatToParts(instant);
-  const { year, month, day, hour, minute, second } = Object.fromEntries(
-    parts.map(({ type, value }) => [type, value]),
-  );
-  return `${year}-${month}-${day}T${hour}:${minute}:${second}`;
-}
-
-function toInstant(local: string, formatter: Intl.DateTimeFormat) {
-  const wallTime = Date.parse(`${local}Z`);
-  const offsetAt = (instant: number) =>
-    Date.parse(`${localDateTime(new Date(instant), formatter)}Z`) - instant;
-
-  const estimate = wallTime - offsetAt(wallTime);
-  const instant = new Date(wallTime - offsetAt(estimate));
-  return localDateTime(instant, formatter) === local ? instant : null;
-}
-
 export async function calculateAvailability(
   input: z.input<typeof availabilityInput>,
   { tx, now = new Date() }: { tx?: Prisma.TransactionClient; now?: Date } = {},
@@ -58,27 +37,12 @@ export async function calculateAvailability(
   if (!parsed.success) return { status: "invalid_input", slots: [] };
   const { date, guests } = parsed.data;
   const timeZone = restaurantTimeZone();
-  const formatter = new Intl.DateTimeFormat("sv-SE", {
-    timeZone, year: "numeric", month: "2-digit", day: "2-digit",
-    hour: "2-digit", minute: "2-digit", second: "2-digit", hourCycle: "h23",
-  });
   const { first, last } = bookingDateRange(now, timeZone);
   if (date < first || date > last) return { status: "outside_horizon", slots: [] };
 
-  const calendarDay = new Date(`${date}T00:00:00Z`);
-  if (calendarDay.getUTCDay() === 1) return { status: "closed", slots: [] };
-
-  const closing = toInstant(`${date}T21:00:00`, formatter);
-  if (!closing) return { status: "closed", slots: [] };
-
-  const windows = ["12:00", "13:30", "15:00", "16:30", "18:00", "19:30"].flatMap(
-    (time): Interval[] => {
-      const startsAt = toInstant(`${date}T${time}:00`, formatter);
-      if (!startsAt || startsAt <= now) return [];
-      const endsAt = new Date(startsAt.getTime() + slotMinutes * minuteMs);
-      return endsAt <= closing ? [{ startsAt, endsAt }] : [];
-    },
-  );
+  const scheduled = restaurantWindows(date, timeZone);
+  if (!scheduled) return { status: "closed", slots: [] };
+  const windows = scheduled.filter(({ startsAt }) => startsAt > now);
   if (windows.length === 0) return { status: "no_availability", slots: [] };
 
   const { status, ...range } = overlappingBookings({

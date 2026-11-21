@@ -1,7 +1,7 @@
 import { checkAdminAccess } from "../../../../../lib/auth/access";
 import { currentSessionToken } from "../../../../../lib/auth/session";
 import { changeAdminBookingStatus, findAdminBooking } from "../../../../../lib/booking/admin";
-import { accessDenied, reply } from "../response";
+import { accessDenied, reply } from "../../response";
 
 type Context = { params: Promise<{ id: string }> };
 
