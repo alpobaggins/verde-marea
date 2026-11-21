@@ -8,7 +8,8 @@
     "start": "next start",
     "lint": "eslint .",
     "typecheck": "prisma generate && next typegen && tsc --noEmit",
-    "test:auth": "prisma generate && tsx --test tests/auth.test.ts"
+    "test:auth": "prisma generate && tsx --test tests/auth.test.ts",
+    "test:availability": "prisma generate && tsx --test tests/availability.test.ts"
   },
   "dependencies": {
     "@prisma/adapter-pg": "7.10.1",
